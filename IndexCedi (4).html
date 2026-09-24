@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Movimientos de Inventario — Alara CEDI</title>
+<style>
+  :root {
+    --wine: #6D1B3D;
+    --wine-dark: #4A1229;
+    --blush: #F2D9E1;
+    --blush-light: #FBF2F5;
+    --cream: #FBF6EF;
+    --text: #2B1620;
+    --gray: #767676;
+    --ok: #3D7A4E;
+    --alert: #B23A48;
+    --border: #E7D6DC;
+    --ingreso: #2E7D5C;
+    --baja: #8B3A3A;
+    --venta: #2F6690;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--cream); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: var(--text); }
+  #app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #fff; }
+  header.top { background: var(--wine); color: #fff; padding: 18px 20px 16px; position: sticky; top: 0; z-index: 5; }
+  header.top h1 { font-size: 18px; margin: 0; font-weight: 700; }
+  header.top p { margin: 2px 0 0; font-size: 12.5px; color: var(--blush); }
+  .screen { padding: 18px 18px 90px; display: none; }
+  .screen.active { display: block; }
+
+  .field { margin-bottom: 18px; }
+  label.field-label { display: block; font-size: 13.5px; font-weight: 700; color: var(--wine); margin-bottom: 6px; }
+  input[type=text], input[type=number], input[type=date], textarea, select {
+    width: 100%; padding: 12px 13px; font-size: 15px; border: 1.5px solid var(--border);
+    border-radius: 10px; background: #fff; color: var(--text); font-family: inherit;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--wine); }
+
+  .btn { display: block; width: 100%; padding: 16px; border-radius: 14px; border: none; font-size: 17px; font-weight: 700; text-align: center; cursor: pointer; margin-bottom: 14px; }
+  .btn-ingreso { background: var(--ingreso); color: #fff; }
+  .btn-baja { background: var(--baja); color: #fff; }
+  .btn-venta { background: var(--venta); color: #fff; }
+  .btn-sub { font-size: 12.5px; font-weight: 400; display: block; opacity: 0.85; margin-top: 3px; }
+  .btn-primary { background: var(--wine); color: #fff; padding: 15px; border-radius: 12px; border: none; font-size: 16px; font-weight: 700; width: 100%; }
+  .btn-primary:disabled { background: #C9A7B4; }
+  .back-link { font-size: 13.5px; color: var(--wine); font-weight: 600; cursor: pointer; display: inline-block; margin-bottom: 14px; }
+
+  .segmented { display: flex; gap: 8px; }
+  .segmented button { flex: 1; padding: 12px 6px; border-radius: 10px; border: 1.5px solid var(--border); background: #fff; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .segmented button.selected { background: var(--wine); color: #fff; border-color: var(--wine); }
+
+  .movement-tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; color: #fff; margin-bottom: 16px; }
+  .tag-ingreso { background: var(--ingreso); }
+  .tag-baja { background: var(--baja); }
+  .tag-venta { background: var(--venta); }
+
+  .card { border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+  .card .top-row { display: flex; justify-content: space-between; align-items: center; }
+  .card .sku { font-weight: 700; font-size: 14px; }
+  .card .meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--gray); }
+  .empty-state .emoji { font-size: 40px; }
+
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13.5px; max-width: 90%; z-index: 20; display: none; }
+  .confirm-icon { width: 60px; height: 60px; border-radius: 50%; color: #fff; font-size: 30px; display: flex; align-items: center; justify-content: center; margin: 30px auto 16px; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 24px 0 10px; }
+
+  .field { position: relative; }
+  .field-error {
+    color: var(--alert); font-size: 12px; font-weight: 700; margin-top: 5px;
+    text-align: left; display: flex; align-items: center; gap: 4px;
+  }
+  .field-error::before { content: "⚠"; }
+  .input-error { border-color: var(--alert) !important; background: #FCEFEF; }
+  .input-error.segmented button { border-color: var(--alert); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <h1>Movimientos de Inventario</h1>
+    <p>Alara · CEDI</p>
+  </header>
+
+  <!-- PANTALLA 1: MENU PRINCIPAL -->
+  <div class="screen active" id="screen-menu">
+    <div style="margin-top: 20px;">
+      <button class="btn btn-venta" onclick="abrirFormularioVenta()">
+        🧾 Registrar Venta
+        <span class="btn-sub">Queda directo en el Registro de Ventas</span>
+      </button>
+      <button class="btn btn-ingreso" onclick="abrirFormulario('Ingreso')">
+        📥 Registrar Ingreso
+        <span class="btn-sub">Entra mercancía o empaque al CEDI</span>
+      </button>
+      <button class="btn btn-baja" onclick="abrirFormulario('Baja')">
+        🔻 Registrar Baja
+        <span class="btn-sub">Se pierde o daña producto/empaque</span>
+      </button>
+    </div>
+
+    <div class="section-title">Movimientos de hoy</div>
+    <div id="lista-hoy">
+      <div class="empty-state"><div class="emoji">⏳</div><p>Cargando...</p></div>
+    </div>
+  </div>
+
+  <!-- PANTALLA 2: FORMULARIO -->
+  <div class="screen" id="screen-form">
+    <span class="back-link" onclick="mostrarPantalla('screen-menu'); cargarHoy();">← Volver al menú</span>
+    <div id="form-tag"></div>
+
+    <div class="field">
+      <label class="field-label">¿Qué es: producto o empaque?</label>
+      <div class="segmented" data-name="tipoItem">
+        <button onclick="seleccionar(this,'tipoItem')">Producto</button>
+        <button onclick="seleccionar(this,'tipoItem')">Empaque</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">SKU / Referencia</label>
+      <select id="input-sku"></select>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Cantidad</label>
+      <input type="number" id="input-cantidad" min="0" inputmode="numeric" placeholder="Ej.: 50">
+    </div>
+
+    <div class="field">
+      <label class="field-label">Motivo</label>
+      <select id="input-motivo"></select>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Fecha</label>
+      <input type="date" id="input-fecha">
+    </div>
+
+    <div class="field">
+      <label class="field-label">Notas (opcional)</label>
+      <textarea id="input-notas" placeholder="Cualquier detalle adicional"></textarea>
+    </div>
+
+    <button class="btn-primary" id="btn-enviar" onclick="enviarMovimiento()">Guardar movimiento</button>
+  </div>
+
+  <!-- PANTALLA 2B: FORMULARIO DE VENTA (FACTURA CON VARIAS LINEAS) -->
+  <div class="screen" id="screen-form-venta">
+    <span class="back-link" onclick="mostrarPantalla('screen-menu'); cargarHoy();">← Volver al menú</span>
+    <span class="back-link" style="float:right;" onclick="recargarConfig(false, poblarSelectsVenta)">🔄 Actualizar precios</span>
+    <span class="movement-tag tag-venta">🧾 VENTA</span>
+
+    <div class="section-title" style="margin-top:0;">1. Datos de la factura</div>
+
+    <div class="field">
+      <label class="field-label">Canal</label>
+      <select id="v-canal"></select>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Cliente</label>
+      <select id="v-cliente"></select>
+    </div>
+
+    <div class="field">
+      <label class="field-label">¿Cobrado?</label>
+      <div class="segmented" data-name="cobrado">
+        <button type="button" onclick="seleccionar(this,'cobrado')">Sí</button>
+        <button type="button" onclick="seleccionar(this,'cobrado')">No</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Negociación de pago</label>
+      <div class="segmented" data-name="negociacionPago" style="flex-wrap: wrap;">
+        <button type="button" onclick="seleccionar(this,'negociacionPago')">Crédito</button>
+        <button type="button" onclick="seleccionar(this,'negociacionPago')">Contado</button>
+        <button type="button" onclick="seleccionar(this,'negociacionPago')">Consignación</button>
+        <button type="button" onclick="seleccionar(this,'negociacionPago')">Otro</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Fecha</label>
+      <input type="date" id="v-fecha">
+    </div>
+
+    <div class="field">
+      <label class="field-label">N° Factura y sede</label>
+      <input type="text" id="v-factura" placeholder="Ej.: ALAR 116 - Bogotá">
+    </div>
+
+    <div class="field">
+      <label class="field-label">Domicilio de toda la factura ($COP, si aplica)</label>
+      <input type="number" id="v-domicilio" min="0" inputmode="numeric" placeholder="0" value="0">
+    </div>
+
+    <div class="section-title">2. Productos de esta factura</div>
+    <div id="lineas-agregadas"></div>
+
+    <div class="card" style="background: var(--blush-light); border-color: var(--blush);">
+      <div class="field" style="margin-bottom:12px;">
+        <label class="field-label">Producto</label>
+        <select id="v-producto"></select>
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label class="field-label">Cantidad</label>
+        <input type="number" id="v-cantidad" min="0" inputmode="numeric" placeholder="Ej.: 12">
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label class="field-label">Precio unitario ($COP)</label>
+        <input type="number" id="v-precio" min="0" inputmode="numeric" placeholder="Ej.: 12500">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label class="field-label">Descuento (%)</label>
+        <input type="number" id="v-descuento" min="0" max="100" inputmode="numeric" placeholder="0" value="0">
+      </div>
+      <button type="button" class="btn-primary" style="background:var(--venta); margin-top:14px;" onclick="agregarLinea()">➕ Agregar producto a la factura</button>
+    </div>
+
+    <div class="card" style="margin-top:16px; background: var(--wine); border: none;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="color:#fff; font-weight:700; font-size:15px;">Total de la factura</span>
+        <span style="color:#fff; font-weight:700; font-size:20px;" id="total-factura">$0</span>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="btn-enviar-venta" onclick="enviarFactura()" style="margin-top:16px;">Guardar factura completa</button>
+  </div>
+
+  <!-- PANTALLA 3: CONFIRMACION -->
+  <div class="screen" id="screen-ok">
+    <div class="confirm-icon" id="confirm-icon">✓</div>
+    <h2 style="text-align:center;" id="confirm-title">Movimiento guardado</h2>
+    <p style="text-align:center; color:var(--gray); font-size:14px;" id="confirm-detalle"></p>
+    <button class="btn-primary" onclick="mostrarPantalla('screen-menu'); cargarHoy();" style="margin-top:20px;">Volver al menú</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  // =====================================================================
+  // CAPA DE COMPATIBILIDAD: permite que este MISMO archivo funcione tanto
+  // servido directo por Apps Script (usa remoto()) como hospedado
+  // en GitHub Pages u otro sitio externo (usa fetch() contra SCRIPT_URL).
+  // Si vas a montarlo en GitHub, reemplaza SCRIPT_URL por la URL /exec de
+  // tu despliegue de Apps Script (Implementar > Gestionar implementaciones).
+  // =====================================================================
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxkGs1TATYhUBtP_vTBo6eZkKLDnS5p2jIZCNuSBRjQfGDATXzEWCgNwrxvzNBgrDVfA/exec"; // solo se usa fuera de Apps Script
+  const USANDO_APPS_SCRIPT = (typeof google !== 'undefined' && !!(google.script && google.script.run));
+  const FUNCIONES_DE_LECTURA = ['getConfigCedi', 'getMovimientosDeHoy']; // sin argumentos, van por GET
+
+  function remoto() {
+    let onOk = function () {};
+    let onErr = function () {};
+    const api = {
+      withSuccessHandler: function (fn) { onOk = fn; return api; },
+      withFailureHandler: function (fn) { onErr = fn; return api; }
+    };
+    ['getConfigCedi', 'getMovimientosDeHoy', 'submitMovimientoCedi', 'submitFacturaCedi'].forEach(function (nombre) {
+      api[nombre] = function (arg) {
+        if (USANDO_APPS_SCRIPT) {
+          google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr)[nombre](arg);
+          return;
+        }
+        // Fuera de Apps Script (GitHub Pages, etc.): la misma función pero por fetch().
+        const esLectura = FUNCIONES_DE_LECTURA.indexOf(nombre) !== -1;
+        const peticion = esLectura
+          ? fetch(SCRIPT_URL + '?action=' + encodeURIComponent(nombre))
+          : fetch(SCRIPT_URL, {
+              method: 'POST',
+              // text/plain a propósito: evita el preflight CORS que Apps Script no responde.
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: nombre, data: JSON.stringify(arg) })
+            });
+        peticion
+          .then(function (r) { return r.json(); })
+          .then(function (res) { res.ok ? onOk(res.data) : onErr({ message: res.error }); })
+          .catch(function (e) { onErr({ message: 'No se pudo conectar con el Sheet: ' + e }); });
+      };
+    });
+    return api;
+  }
+
+  let config = { skus: [], motivos: {}, canales: [], clientes: [], productos: [], precios: {}, preciosCliente: {} };
+  let tipoMovimientoActual = null;
+  let respuestas = {};
+  const COLORES = { Ingreso: '#2E7D5C', Baja: '#8B3A3A', Venta: '#2F6690' };
+  const ETIQUETAS = { Ingreso: '📥 INGRESO', Baja: '🔻 BAJA', Venta: '🧾 VENTA' };
+  const CLASES_TAG = { Ingreso: 'tag-ingreso', Baja: 'tag-baja', Venta: 'tag-venta' };
+
+  function mostrarPantalla(id) {
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0,0);
+  }
+
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(function(){ t.style.display = 'none'; }, 2600);
+  }
+
+  window.onload = function() {
+    recargarConfig(true);
+    cargarHoy();
+  };
+
+  // Vuelve a leer Portafolio / Clientes / Precios por Cliente desde el Sheet.
+  // Se llama sola al abrir la app, y también manualmente desde "🔄 Actualizar precios"
+  // por si alguien deja la app abierta y mientras tanto se edita un precio en el Excel.
+  function recargarConfig(silencioso, callback) {
+    remoto().withSuccessHandler(function(cfg) {
+      config = cfg;
+      if (cfg.errores && cfg.errores.length) {
+        mostrarErrorConfig(cfg.errores);
+      }
+      if (!silencioso) toast('Precios y clientes actualizados');
+      if (callback) callback();
+    }).withFailureHandler(function(err){ mostrarErrorConfig([err.message]); }).getConfigCedi();
+  }
+
+  function mostrarErrorConfig(errores) {
+    var banner = document.getElementById('config-error-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'config-error-banner';
+      banner.style.cssText = 'position:sticky;top:0;z-index:20;background:#B23A48;color:#fff;padding:12px 16px;font-size:13px;line-height:1.4;';
+      document.getElementById('app').insertBefore(banner, document.getElementById('app').firstChild);
+    }
+    banner.innerHTML = '<b>⚠️ No cargó parte de la configuración:</b><br>' +
+      errores.map(function(e){ return '· ' + escapeHtml(e); }).join('<br>') +
+      '<br><span style="opacity:.85">Revisa que el nombre de esa hoja en el Sheet sea exactamente igual al esperado.</span>';
+  }
+
+  function cargarHoy() {
+    document.getElementById('lista-hoy').innerHTML = '<div class="empty-state"><div class="emoji">⏳</div><p>Cargando...</p></div>';
+    remoto()
+      .withSuccessHandler(renderHoy)
+      .withFailureHandler(function(err){ toast('Error: ' + err.message); })
+      .getMovimientosDeHoy();
+  }
+
+  function renderHoy(movs) {
+    const cont = document.getElementById('lista-hoy');
+    if (!movs || movs.length === 0) {
+      cont.innerHTML = '<div class="empty-state"><div class="emoji">📋</div><p>Aún no hay movimientos registrados hoy.</p></div>';
+      return;
+    }
+    cont.innerHTML = '';
+    movs.slice().reverse().forEach(function(m) {
+      const div = document.createElement('div');
+      div.className = 'card';
+      if (m.tipoMovimiento === 'Venta') {
+        div.innerHTML =
+          '<div class="top-row"><span class="sku">' + escapeHtml(m.sku) + '</span>' +
+          '<span class="movement-tag ' + CLASES_TAG[m.tipoMovimiento] + '">' + ETIQUETAS[m.tipoMovimiento] + '</span></div>' +
+          '<div class="meta">' + escapeHtml(m.motivo) + ' · ' + escapeHtml(m.tipoItem) + ' · Cant: ' + escapeHtml(String(m.cantidad)) + '</div>';
+      } else {
+        div.innerHTML =
+          '<div class="top-row"><span class="sku">' + escapeHtml(m.sku) + '</span>' +
+          '<span class="movement-tag ' + CLASES_TAG[m.tipoMovimiento] + '">' + ETIQUETAS[m.tipoMovimiento] + '</span></div>' +
+          '<div class="meta">' + escapeHtml(m.tipoItem) + ' · Cant: ' + escapeHtml(String(m.cantidad)) + ' · ' + escapeHtml(m.motivo) + '</div>';
+      }
+      cont.appendChild(div);
+    });
+  }
+
+  // ---- Errores en línea (al costado del campo, no toast) ----
+  function marcarError(campoId, msg) {
+    limpiarError(campoId);
+    const el = document.getElementById(campoId);
+    if (!el) { toast(msg); return; }
+    const contenedor = el.closest('.field') || el.parentElement;
+    const err = document.createElement('div');
+    err.className = 'field-error';
+    err.id = campoId + '-error';
+    err.textContent = msg;
+    contenedor.appendChild(err);
+    el.classList.add('input-error');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function limpiarError(campoId) {
+    const prev = document.getElementById(campoId + '-error');
+    if (prev) prev.remove();
+    const el = document.getElementById(campoId);
+    if (el) el.classList.remove('input-error');
+  }
+
+  function limpiarErroresFormulario(formId) {
+    document.querySelectorAll('#' + formId + ' .field-error').forEach(function (e) { e.remove(); });
+    document.querySelectorAll('#' + formId + ' .input-error').forEach(function (e) { e.classList.remove('input-error'); });
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function abrirFormulario(tipo) {
+    tipoMovimientoActual = tipo;
+    respuestas = {};
+    limpiarErroresFormulario('screen-form');
+    document.getElementById('form-tag').innerHTML =
+      '<span class="movement-tag ' + CLASES_TAG[tipo] + '">' + ETIQUETAS[tipo] + '</span>';
+
+    document.querySelectorAll('.segmented button').forEach(function(b){ b.classList.remove('selected'); });
+
+    const skuSelect = document.getElementById('input-sku');
+    skuSelect.innerHTML = '<option value="">Selecciona...</option>' +
+      config.skus.map(function(s){ return '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>'; }).join('');
+
+    const motivoSelect = document.getElementById('input-motivo');
+    const motivos = config.motivos[tipo] || [];
+    motivoSelect.innerHTML = '<option value="">Selecciona...</option>' +
+      motivos.map(function(m){ return '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>'; }).join('');
+
+    document.getElementById('input-cantidad').value = '';
+    document.getElementById('input-notas').value = '';
+    const hoy = new Date();
+    document.getElementById('input-fecha').value = hoy.toISOString().slice(0,10);
+
+    mostrarPantalla('screen-form');
+  }
+
+  function seleccionar(btn, campo) {
+    const grupo = btn.parentElement;
+    grupo.querySelectorAll('button').forEach(function(b){ b.classList.remove('selected'); });
+    btn.classList.add('selected');
+    respuestas[campo] = btn.textContent;
+  }
+
+  function enviarMovimiento() {
+    limpiarErroresFormulario('screen-form');
+    let ok = true;
+    if (!respuestas.tipoItem) { marcarError('input-sku', 'Selecciona si es Producto o Empaque'); ok = false; }
+    const sku = document.getElementById('input-sku').value;
+    if (!sku) { marcarError('input-sku', 'Selecciona el SKU / Referencia'); ok = false; }
+    const cantidad = document.getElementById('input-cantidad').value;
+    if (!cantidad || Number(cantidad) <= 0) { marcarError('input-cantidad', 'Ingresa una cantidad válida'); ok = false; }
+    const motivo = document.getElementById('input-motivo').value;
+    if (!motivo) { marcarError('input-motivo', 'Selecciona el motivo'); ok = false; }
+    if (!ok) return;
+    const fecha = document.getElementById('input-fecha').value;
+
+    const payload = {
+      tipoMovimiento: tipoMovimientoActual,
+      tipoItem: respuestas.tipoItem,
+      sku: sku,
+      cantidad: cantidad,
+      motivo: motivo,
+      fecha: fecha,
+      notas: document.getElementById('input-notas').value
+    };
+
+    const btn = document.getElementById('btn-enviar');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Guardando...';
+
+    remoto()
+      .withSuccessHandler(function(res) {
+        document.getElementById('confirm-icon').style.background = COLORES[tipoMovimientoActual];
+        document.getElementById('confirm-title').textContent = ETIQUETAS[tipoMovimientoActual] + ' guardado';
+        document.getElementById('confirm-detalle').textContent = sku + ' · Cantidad: ' + cantidad + ' · ' + motivo;
+        mostrarPantalla('screen-ok');
+        btn.disabled = false;
+        btn.textContent = 'Guardar movimiento';
+      })
+      .withFailureHandler(function(err) {
+        toast('Error al guardar: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Guardar movimiento';
+      })
+      .submitMovimientoCedi(payload);
+  }
+
+  let lineasFactura = [];
+
+  function abrirFormularioVenta() {
+    respuestas = {};
+    lineasFactura = [];
+    limpiarErroresFormulario('screen-form-venta');
+    document.querySelectorAll('#screen-form-venta .segmented button').forEach(function(b){ b.classList.remove('selected'); });
+
+    document.getElementById('v-cantidad').value = '';
+    document.getElementById('v-precio').value = '';
+    document.getElementById('v-descuento').value = '0';
+    document.getElementById('v-domicilio').value = '0';
+    document.getElementById('v-factura').value = '';
+    document.getElementById('v-fecha').value = new Date().toISOString().slice(0,10);
+
+    renderLineas();
+    mostrarPantalla('screen-form-venta');
+
+    // Si la configuración (canales/clientes/productos) todavía no llegó del servidor
+    // -por ejemplo, si esta pantalla se abrió apenas cargó la página-, se recarga
+    // AHORA y los desplegables se llenan solo cuando el dato ya está, en vez de
+    // quedar vacíos con solo "Selecciona...".
+    if (!config.canales || config.canales.length === 0) {
+      const canalSelect = document.getElementById('v-canal');
+      canalSelect.innerHTML = '<option value="">Cargando...</option>';
+      recargarConfig(true, poblarSelectsVenta);
+    } else {
+      poblarSelectsVenta();
+    }
+  }
+
+  function poblarSelectsVenta() {
+    const canalSelect = document.getElementById('v-canal');
+    const canalPrevio = canalSelect.value;
+    canalSelect.innerHTML = '<option value="">Selecciona...</option>' +
+      config.canales.map(function(c){ return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'; }).join('');
+    if (config.canales.indexOf(canalPrevio) !== -1) canalSelect.value = canalPrevio;
+
+    poblarClientes(canalSelect.value);
+
+    const productoSelect = document.getElementById('v-producto');
+    const productoPrevio = productoSelect.value;
+    productoSelect.innerHTML = '<option value="">Selecciona...</option>' +
+      config.productos.map(function(p){ return '<option value="' + escapeHtml(p) + '">' + escapeHtml(p) + '</option>'; }).join('');
+    if (config.productos.indexOf(productoPrevio) !== -1) productoSelect.value = productoPrevio;
+  }
+
+  // Cliente actualmente seleccionado en el formulario de venta — para filtrar por canal
+  // y para tomar la negociación de pago por defecto guardada en 👥 Clientes.
+  function poblarClientes(canalFiltro) {
+    const clienteSelect = document.getElementById('v-cliente');
+    const seleccionActual = clienteSelect.value;
+    const lista = canalFiltro
+      ? config.clientes.filter(function(c){ return c.canal === canalFiltro; })
+      : config.clientes;
+    clienteSelect.innerHTML = '<option value="">Selecciona...</option>' +
+      lista.map(function(c){ return '<option value="' + escapeHtml(c.nombre) + '">' + escapeHtml(c.nombre) + '</option>'; }).join('');
+    if (lista.some(function(c){ return c.nombre === seleccionActual; })) {
+      clienteSelect.value = seleccionActual;
+    }
+  }
+
+  document.getElementById('v-canal').addEventListener('change', function() {
+    limpiarError('v-canal');
+    poblarClientes(this.value);
+  });
+
+  document.getElementById('v-cliente').addEventListener('change', function() {
+    limpiarError('v-cliente');
+    const cliente = config.clientes.find(function(c){ return c.nombre === this.value; }, this);
+    if (cliente && cliente.negociacion) {
+      const grupo = document.querySelector('.segmented[data-name="negociacionPago"]');
+      grupo.querySelectorAll('button').forEach(function(b) {
+        b.classList.toggle('selected', b.textContent === cliente.negociacion);
+      });
+      respuestas.negociacionPago = cliente.negociacion;
+    }
+  });
+
+  document.getElementById('v-producto').addEventListener('change', function() {
+    const producto = this.value;
+    const cliente = document.getElementById('v-cliente').value;
+    if (!producto) return;
+    const precioEspecial = cliente ? config.preciosCliente[cliente + '||' + producto] : undefined;
+    const precio = precioEspecial !== undefined ? precioEspecial : config.precios[producto];
+    if (precio !== undefined) {
+      document.getElementById('v-precio').value = precio;
+    }
+  });
+
+  function subtotalLinea(l) {
+    return l.cantidad * l.precio * (1 - l.descuento / 100);
+  }
+
+  function renderLineas() {
+    const cont = document.getElementById('lineas-agregadas');
+    if (lineasFactura.length === 0) {
+      cont.innerHTML = '<p style="font-size:13px; color:var(--gray); margin:0 0 12px;">Aún no has agregado productos.</p>';
+    } else {
+      cont.innerHTML = '';
+      lineasFactura.forEach(function(l, i) {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML =
+          '<div class="top-row"><span class="sku">' + escapeHtml(l.producto) + '</span>' +
+          '<span style="color:var(--alert); cursor:pointer; font-weight:700;" onclick="quitarLinea(' + i + ')">✕ Quitar</span></div>' +
+          '<div class="meta">' + l.cantidad + ' x $' + Math.round(l.precio).toLocaleString('es-CO') +
+          (l.descuento > 0 ? ' (' + l.descuento + '% dcto)' : '') +
+          ' = $' + Math.round(subtotalLinea(l)).toLocaleString('es-CO') + '</div>';
+        cont.appendChild(div);
+      });
+    }
+    actualizarTotalFactura();
+  }
+
+  function actualizarTotalFactura() {
+    const domicilio = Number(document.getElementById('v-domicilio').value) || 0;
+    const subtotal = lineasFactura.reduce(function(sum, l) { return sum + subtotalLinea(l); }, 0);
+    document.getElementById('total-factura').textContent = '$' + Math.round(subtotal + domicilio).toLocaleString('es-CO');
+  }
+  document.getElementById('v-domicilio').addEventListener('input', actualizarTotalFactura);
+
+  function quitarLinea(i) {
+    lineasFactura.splice(i, 1);
+    renderLineas();
+  }
+
+  function agregarLinea() {
+    limpiarError('v-producto'); limpiarError('v-cantidad'); limpiarError('v-precio');
+    let ok = true;
+    const producto = document.getElementById('v-producto').value;
+    if (!producto) { marcarError('v-producto', 'Selecciona el producto'); ok = false; }
+    const cantidad = Number(document.getElementById('v-cantidad').value);
+    if (!cantidad || cantidad <= 0) { marcarError('v-cantidad', 'Ingresa una cantidad válida'); ok = false; }
+    const precio = Number(document.getElementById('v-precio').value);
+    if (!precio || precio < 0) { marcarError('v-precio', 'Ingresa el precio unitario'); ok = false; }
+    if (!ok) return;
+    const descuento = Number(document.getElementById('v-descuento').value) || 0;
+
+    lineasFactura.push({ producto: producto, cantidad: cantidad, precio: precio, descuento: descuento });
+
+    document.getElementById('v-producto').value = '';
+    document.getElementById('v-cantidad').value = '';
+    document.getElementById('v-precio').value = '';
+    document.getElementById('v-descuento').value = '0';
+
+    renderLineas();
+    toast('Producto agregado a la factura');
+  }
+
+  function enviarFactura() {
+    limpiarErroresFormulario('screen-form-venta');
+    let ok = true;
+    const canal = document.getElementById('v-canal').value;
+    if (!canal) { marcarError('v-canal', 'Selecciona el canal'); ok = false; }
+    const cliente = document.getElementById('v-cliente').value;
+    if (!cliente) { marcarError('v-cliente', 'Selecciona el nombre del cliente'); ok = false; }
+    if (!respuestas.cobrado) { toast('Indica si está cobrado'); ok = false; }
+    if (!respuestas.negociacionPago) { toast('Selecciona la negociación de pago'); ok = false; }
+    const fecha = document.getElementById('v-fecha').value;
+    if (!fecha) { marcarError('v-fecha', 'Selecciona la fecha'); ok = false; }
+    if (lineasFactura.length === 0) { toast('Agrega al menos un producto a la factura'); ok = false; }
+    if (!ok) return;
+
+    const payload = {
+      canal: canal,
+      cliente: cliente,
+      cobrado: respuestas.cobrado,
+      negociacionPago: respuestas.negociacionPago,
+      fecha: fecha,
+      facturaYSede: document.getElementById('v-factura').value,
+      domicilio: document.getElementById('v-domicilio').value || 0,
+      lineas: lineasFactura
+    };
+
+    const btn = document.getElementById('btn-enviar-venta');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Guardando...';
+
+    remoto()
+      .withSuccessHandler(function(res) {
+        document.getElementById('confirm-icon').style.background = COLORES.Venta;
+        document.getElementById('confirm-title').textContent = '🧾 Factura guardada';
+        document.getElementById('confirm-detalle').textContent =
+          lineasFactura.length + ' producto(s) · ' + cliente + ' · Total: ' + document.getElementById('total-factura').textContent;
+        mostrarPantalla('screen-ok');
+        btn.disabled = false;
+        btn.textContent = 'Guardar factura completa';
+      })
+      .withFailureHandler(function(err) {
+        toast('Error al guardar: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Guardar factura completa';
+      })
+      .submitFacturaCedi(payload);
+  }
+</script>
+</body>
+</html>
