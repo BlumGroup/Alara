@@ -360,10 +360,11 @@
       const div = document.createElement('div');
       div.className = 'card';
       if (m.tipoMovimiento === 'Venta') {
+        const totalFmt = '$' + Math.round(Number(m.totalFactura) || 0).toLocaleString('es-CO');
         div.innerHTML =
-          '<div class="top-row"><span class="sku">' + escapeHtml(m.sku) + '</span>' +
+          '<div class="top-row"><span class="sku">' + escapeHtml(m.cliente || 'Sin cliente') + '</span>' +
           '<span class="movement-tag ' + CLASES_TAG[m.tipoMovimiento] + '">' + ETIQUETAS[m.tipoMovimiento] + '</span></div>' +
-          '<div class="meta">' + escapeHtml(m.motivo) + ' · ' + escapeHtml(m.tipoItem) + ' · Cant: ' + escapeHtml(String(m.cantidad)) + '</div>';
+          '<div class="meta">Total unidades: ' + escapeHtml(String(m.totalUnidades)) + ' · Total factura: ' + totalFmt + '</div>';
       } else {
         div.innerHTML =
           '<div class="top-row"><span class="sku">' + escapeHtml(m.sku) + '</span>' +
