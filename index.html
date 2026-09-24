@@ -252,7 +252,7 @@
   // Si vas a montarlo en GitHub, reemplaza SCRIPT_URL por la URL /exec de
   // tu despliegue de Apps Script (Implementar > Gestionar implementaciones).
   // =====================================================================
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxxkGs1TATYhUBtP_vTBo6eZkKLDnS5p2jIZCNuSBRjQfGDATXzEWCgNwrxvzNBgrDVfA/exec"; // solo se usa fuera de Apps Script
+  const SCRIPT_URL = "PEGA_AQUI_TU_URL_/exec"; // solo se usa fuera de Apps Script
   const USANDO_APPS_SCRIPT = (typeof google !== 'undefined' && !!(google.script && google.script.run));
   const FUNCIONES_DE_LECTURA = ['getConfigCedi', 'getMovimientosDeHoy']; // sin argumentos, van por GET
 
@@ -437,6 +437,22 @@
     grupo.querySelectorAll('button').forEach(function(b){ b.classList.remove('selected'); });
     btn.classList.add('selected');
     respuestas[campo] = btn.textContent;
+
+    if (campo === 'negociacionPago') {
+      aplicarCobradoPorNegociacion(btn.textContent);
+    }
+  }
+
+  // Crédito o Consignación => no está cobrado todavía. Contado => sí está cobrado.
+  // Otro => se asume no cobrado por defecto. Siempre queda editable manualmente después.
+  function aplicarCobradoPorNegociacion(negociacion) {
+    const cobradoPorDefecto = negociacion === 'Contado' ? 'Sí' : 'No';
+    const grupoCobrado = document.querySelector('#screen-form-venta .segmented[data-name="cobrado"]');
+    if (!grupoCobrado) return;
+    grupoCobrado.querySelectorAll('button').forEach(function(b) {
+      b.classList.toggle('selected', b.textContent === cobradoPorDefecto);
+    });
+    respuestas.cobrado = cobradoPorDefecto;
   }
 
   function enviarMovimiento() {
@@ -559,6 +575,7 @@
         b.classList.toggle('selected', b.textContent === cliente.negociacion);
       });
       respuestas.negociacionPago = cliente.negociacion;
+      aplicarCobradoPorNegociacion(cliente.negociacion);
     }
   });
 
