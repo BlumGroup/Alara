@@ -302,6 +302,16 @@
     window.scrollTo(0,0);
   }
 
+  // Fecha de HOY en formato YYYY-MM-DD, usando la hora LOCAL del dispositivo (no UTC).
+  // toISOString() convierte a UTC, así que en Colombia (UTC-5), de 7pm a medianoche
+  // ya cae en el día siguiente en UTC y el campo de fecha se autocompletaba mal.
+  function fechaLocalISO() {
+    const d = new Date();
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const dia = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mes + '-' + dia;
+  }
+
   function toast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -428,8 +438,7 @@
 
     document.getElementById('input-cantidad').value = '';
     document.getElementById('input-notas').value = '';
-    const hoy = new Date();
-    document.getElementById('input-fecha').value = hoy.toISOString().slice(0,10);
+    document.getElementById('input-fecha').value = fechaLocalISO();
 
     mostrarPantalla('screen-form');
   }
@@ -514,7 +523,7 @@
     document.getElementById('v-descuento').value = '0';
     document.getElementById('v-domicilio').value = '0';
     document.getElementById('v-factura').value = '';
-    document.getElementById('v-fecha').value = new Date().toISOString().slice(0,10);
+    document.getElementById('v-fecha').value = fechaLocalISO();
 
     renderLineas();
     mostrarPantalla('screen-form-venta');
